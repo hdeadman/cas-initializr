@@ -13,8 +13,7 @@ spec:
     matchLabels: {{- include "common.labels.matchLabels" . | nindent 6 }}
       app.kubernetes.io/component: master  
   selector:
-    matchLabels:
-      {{- include "cas-server.selectorLabels" . | nindent 6 }}
+    matchLabels: {{- include "cas-server.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:

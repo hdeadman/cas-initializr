@@ -598,6 +598,8 @@ containerSecurityContext:
 ## Override parts of this ingress in your own values file with appropriate host names
 ## This currently is only set up to work with Nginx Ingress Controller from Kubernetes project
 cas:
+  test:
+    image: 'alpine:latest'
   service:
     type: ClusterIP
     port: 8443

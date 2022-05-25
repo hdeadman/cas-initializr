@@ -5,8 +5,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ $fullName }}
-  labels:
-    {{- include "cas-server.labels" . | nindent 4 }}
+  labels: {{- include "cas-server.labels" . | nindent 4 }}
   {{- with .Values.cas.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
