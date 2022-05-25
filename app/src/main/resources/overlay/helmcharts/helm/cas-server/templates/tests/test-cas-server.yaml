@@ -9,7 +9,7 @@ metadata:
 spec:
   containers:
     - name: wget
-      image: alpine
+      image: {{ .Values.cas.test.image | default "alpine" }}
       command: ['wget']
       args: [ '--no-check-certificate', 'https://{{ include "cas-server.fullname" . }}:{{ .Values.cas.service.port }}{{ .Values.casServerContainer.defaultStatusUrl }}' ]
   restartPolicy: Never

@@ -49,8 +49,60 @@ logdir:
 
 # CAS Server container properties
 casServerContainer:
+  diagnosticMode:
+    ## @param casServerContainer.diagnosticMode.enabled Enable diagnostic mode (all probes will be disabled and the command will be overridden)
+    ##
+    enabled: false
+    ## @param casServerContainer.diagnosticMode.command Command to override all containers in the statefulset
+    ##
+    command:
+      - /bin/sleep
+    ## @param casServerContainer.diagnosticMode.args Args to override all containers in the statefulset
+    ##
+    args:
+      - infinity
+
   ## Roll on upgrade changes deployment when helm upgrade runs, forcing pod to restart
   alwaysRoll: false
+
+  ## Allowed values: `soft` or `hard`
+  podAffinityPreset: ""
+
+  ## Allowed values: `soft` or `hard`
+  podAntiAffinityPreset: "hard"
+
+  ## Node master.affinity preset
+  ##
+  nodeAffinityPreset:
+    ## Allowed values: `soft` or `hard`
+    ##
+    type: ""
+    ## Node label key to match. 
+    ##
+    key: ""
+    ## Node label values to match.
+    ## E.g.
+    ## values:
+    ##   - e2e-az1
+    ##   - e2e-az2
+    ##
+    values: []
+  ## Affinity for pod assignment
+  ##
+  affinity: {}
+  ## Node labels for cas server pod assignment
+  ##
+  nodeSelector: {}
+  ## Tolerations for cas server pod assignment
+  tolerations: []
+  ## Spread Constraints for cas server pod assignment
+  ## spreadConstraints:
+  ##   - maxSkew: 1
+  ##     topologyKey: node
+  ##     whenUnsatisfiable: DoNotSchedule
+  ##
+  spreadConstraints: {}
+
   ## JVM Settings
   ## JVM settings only used if command not set, use args to set app arguments
   jvm:
@@ -63,6 +115,8 @@ casServerContainer:
     maxHeapOpt: '-Xmx2G'
     newHeapOpt: '-Xms600M'
     debugEnabled: true
+    nodePort: 30500
+    debugPort: 5005
     debugSuspend: "n" # could be n or y, must quote or yaml changes to boolean
   warPath: 'cas.war'
   ## Override cmd
@@ -107,10 +161,9 @@ casServerContainer:
   readinessInitialDelaySeconds: 45
   livenessInitialDelaySeconds: 120
 
-  ## Extra init containers to add to the statefulset
-  ##
-  initContainers: []
-
+  # Integer setting the termination grace period for the cas server pod
+  terminationGracePeriodSeconds: 10
+  
   ## An array to add extra env vars
   ## For example:
   ## extraEnvVars:
@@ -437,7 +490,7 @@ mgmtContainer:
   startupFailureThreshold: 30
   livenessFailureThreshold: 1
   readinessFailureThreshold: 1
-  readinessInitialDelaySeconds: 45
+  readinessInitialDelaySeconds: 60
   livenessInitialDelaySeconds: 120
 
   ## An array to add extra env vars
@@ -565,9 +618,11 @@ cas:
       - host: cas.example.org
         paths:
           - "/cas"
+        pathType: Prefix
       - host: kubernetes.docker.internal
         paths:
           - "/cas"
+        pathType: Prefix
     tls:
       - secretName: cas-server-ingress-tls
         hosts:
@@ -611,9 +666,11 @@ bootadmin:
       - host: casadmin.example.org
         paths:
           - "/"
+        pathType: Prefix
       - host: kubernetes.docker.internal
         paths:
           - "/"
+        pathType: Prefix          
     tls:
       - secretName: cas-server-ingress-tls
         hosts:
@@ -657,9 +714,11 @@ mgmt:
       - host: casmgmt.example.org
         paths:
           - "/cas-management"
+        pathType: Prefix
       - host: kubernetes.docker.internal
         paths:
           - "/cas-management"
+        pathType: Prefix
     tls:
       - secretName: cas-server-ingress-tls
         hosts:

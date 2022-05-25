@@ -10,6 +10,9 @@ spec:
   serviceName: {{ include "cas-server.fullname" . }}
   podManagementPolicy: {{ .Values.podManagementPolicy | quote}}
   selector:
+    matchLabels: {{- include "common.labels.matchLabels" . | nindent 6 }}
+      app.kubernetes.io/component: master  
+  selector:
     matchLabels:
       {{- include "cas-server.selectorLabels" . | nindent 6 }}
   template:
@@ -34,9 +37,38 @@ spec:
       {{- if .Values.podSecurityContext.enabled }}
       securityContext: {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}
+      {{- if .Values.casServerContainer.priorityClassName }}
+      priorityClassName: {{ .Values.casServerContainer.priorityClassName | quote }}
+      {{- end }}
+      {{- if .Values.casServerContainer.affinity }}
+      affinity: {{- include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.affinity "context" $) | nindent 8 }}
+      {{- else }}
+      affinity:
+        podAffinity: {{- include "common.affinities.pods" (dict "type" .Values.casServerContainer.podAffinityPreset "component" "casServerContainer" "context" $) | nindent 10 }}
+        podAntiAffinity: {{- include "common.affinities.pods" (dict "type" .Values.casServerContainer.podAntiAffinityPreset "component" "casServerContainer" "context" $) | nindent 10 }}
+        nodeAffinity: {{- include "common.affinities.nodes" (dict "type" .Values.casServerContainer.nodeAffinityPreset.type "key" .Values.casServerContainer.nodeAffinityPreset.key "values" .Values.casServerContainer.nodeAffinityPreset.values) | nindent 10 }}
+      {{- end }}
+      {{- if .Values.casServerContainer.nodeSelector }}
+      nodeSelector: {{- include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.nodeSelector "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.casServerContainer.tolerations }}
+      tolerations: {{- include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.tolerations "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.casServerContainer.spreadConstraints }}
+      topologySpreadConstraints: {{- include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.spreadConstraints "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.casServerContainer.shareProcessNamespace }}
+      shareProcessNamespace: {{ .Values.casServerContainer.shareProcessNamespace }}
+      {{- end }}
+      {{- if .Values.casServerContainer.schedulerName }}
+      schedulerName: {{ .Values.casServerContainer.schedulerName | quote }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.casServerContainer.terminationGracePeriodSeconds }}      
       volumes:
+        {{- $releaseNamespace  := .Release.Namespace -}}
         {{- range $.Values.casServerContainer.casConfigMounts }}
-        {{- $configMount := printf "%s-%s" "cas-config" . | replace "." "-" | replace "_" "-" | lower }}
+        {{- $filename := . | replace "NAMESPACE" $releaseNamespace }}
+        {{- $configMount := printf "%s-%s" "cas-config" $filename | replace "." "-" | replace "_" "-" | lower }}
         - name: {{ $configMount | quote }}
           configMap:
             name: {{ include "cas-server.fullname" $ }}-casconfig
@@ -60,7 +92,7 @@ spec:
         {{- if .Values.casServerContainer.extraVolumes }}
         {{- include "cas-server.tplvalues.render" ( dict "value" .Values.casServerContainer.extraVolumes "context" $ ) | nindent 8 }}
         {{- end }}
-      {{- if or .Values.casServerContainer.initContainers (and .Values.podSecurityContext.enabled .Values.volumePermissions.enabled .Values.persistence.enabled) }}
+      {{- if or (and .Values.podSecurityContext.enabled .Values.volumePermissions.enabled .Values.persistence.enabled) (.Values.initContainers) }}
       initContainers:
         {{- if and .Values.podSecurityContext.enabled .Values.volumePermissions.enabled .Values.persistence.enabled }}
         - name: volume-permissions
@@ -97,8 +129,8 @@ spec:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
         {{- end }}
-        {{- if .Values.casServerContainer.initContainers }}
-        {{- include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.initContainers "context" $) | nindent 8 }}
+        {{- if .Values.initContainers }}
+        {{- include "cas-server.tplvalues.render" (dict "value" .Values.initContainers "context" $) | nindent 8 }}
         {{- end }}
       {{- end }}
       containers:
@@ -115,7 +147,7 @@ spec:
             {{- end }}
             {{- if .Values.casServerContainer.profiles }}
             - name: CAS_SPRING_PROFILES
-              value: {{ .Values.casServerContainer.profiles | quote }}
+              value: {{ include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.profiles "context" $) | quote }}
             {{- end }}
             {{- if .Values.casServerContainer.jvm.maxHeapOpt }}
             - name: MAX_HEAP_OPT
@@ -151,13 +183,17 @@ spec:
             - secretRef:
                 name: {{ .Values.casServerContainer.extraEnvVarsSecret }}
             {{- end }}
-          {{- if .Values.casServerContainer.command }}
+          {{- if .Values.casServerContainer.diagnosticMode.enabled }}
+          command: {{- include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.diagnosticMode.command "context" $) | nindent 12 }}
+          {{- else if .Values.casServerContainer.command }}
           command: {{- include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.command "context" $) | nindent 12 }}
           {{- else }}
           command:
             - '/entrypoint.sh'
           {{- end }}
-          {{- if .Values.casServerContainer.args }}
+          {{- if .Values.casServerContainer.diagnosticMode.enabled }}
+          args: {{- include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.diagnosticMode.args "context" $) | nindent 12 }}
+          {{- else if .Values.casServerContainer.args }}
           args: {{- include "cas-server.tplvalues.render" (dict "value" .Values.casServerContainer.args "context" $) | nindent 12 }}
           {{- end }}
           ports:
@@ -172,12 +208,14 @@ spec:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}          
             {{- end }}
+            {{- $releaseNamespace := .Release.Namespace -}}
             {{- range $.Values.casServerContainer.casConfigMounts }}
-            {{- $configMount := printf "%s-%s" "cas-config" . | replace "." "-" | replace "_" "-" | lower }}
-            {{- $configMountPath := printf "%s/%s" "/etc/cas/config" . }}
+            {{- $filename := . | replace "NAMESPACE" $releaseNamespace }}
+            {{- $configMount := printf "%s-%s" "cas-config" $filename | replace "." "-" | replace "_" "-" | lower }}
+            {{- $configMountPath := printf "%s/%s" "/etc/cas/config" $filename }}
             - name: {{ $configMount | quote }}
               mountPath: {{ $configMountPath }}
-              subPath: {{ . | quote }}
+              subPath: {{ $filename | quote }}
             {{- end }}
             - name: scripts
               mountPath: /entrypoint.sh
@@ -192,6 +230,7 @@ spec:
             {{- if .Values.casServerContainer.extraVolumeMounts }}
             {{- include "cas-server.tplvalues.render" ( dict "value" .Values.casServerContainer.extraVolumeMounts "context" $ ) | nindent 12 }}
             {{- end }}
+          {{- if not .Values.casServerContainer.diagnosticMode.enabled }}
           startupProbe:
             httpGet:
               path: {{ .Values.casServerContainer.defaultStatusUrl }}
@@ -224,6 +263,7 @@ spec:
             initialDelaySeconds: {{ .Values.casServerContainer.livenessInitialDelaySeconds }}
             periodSeconds: 15
             failureThreshold: {{ .Values.casServerContainer.livenessFailureThreshold }}
+          {{- end }}            
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
