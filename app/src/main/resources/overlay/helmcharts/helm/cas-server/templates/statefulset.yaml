@@ -10,9 +10,6 @@ spec:
   serviceName: {{ include "cas-server.fullname" . }}
   podManagementPolicy: {{ .Values.podManagementPolicy | quote}}
   selector:
-    matchLabels: {{- include "common.labels.matchLabels" . | nindent 6 }}
-      app.kubernetes.io/component: master  
-  selector:
     matchLabels: {{- include "cas-server.selectorLabels" . | nindent 6 }}
   template:
     metadata:
