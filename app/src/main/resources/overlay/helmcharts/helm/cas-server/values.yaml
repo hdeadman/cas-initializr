@@ -119,6 +119,10 @@ casServerContainer:
     debugPort: 5005
     debugSuspend: "n" # could be n or y, must quote or yaml changes to boolean
   warPath: 'cas.war'
+
+  ## Path of mount for built-in entrypoint
+  commandMount: "/entrypoint.sh"
+
   ## Override cmd
   ##
   command:
